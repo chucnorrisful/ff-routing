@@ -46,25 +46,24 @@ func TestFriends(t *testing.T) {
 }
 
 func BenchmarkRouting(b *testing.B) {
-	db := NewDB()
-	k := 100
-	conn := 3
 
-	for i := 0; i < k; i++ {
-		db.addUser(i)
-	}
-
-	for _, u := range db.users {
-		for i := 0; i < k; i++ {
-			if rand.Intn(100) < conn {
-				db.addFriend(u, i)
-				db.addSchedule(u, i, time.Now().Add(time.Duration(rand.Intn(10))*time.Hour), time.Hour*time.Duration(rand.Intn(30)))
-			}
-		}
-	}
+	k := 1000
+	conn := 18
 
 	agg := 0
 	for n := 0; n < b.N; n++ {
+		db := NewDB()
+
+		for i := 0; i < k; i++ {
+			db.addUser(i)
+		}
+
+		for _, u := range db.users {
+			for i := 0; i < conn; i++ {
+				db.addFriend(u, rand.Intn(k))
+				db.addSchedule(u, i, time.Now().Add(time.Duration(rand.Intn(10))*time.Hour), time.Hour, time.Hour*time.Duration(rand.Intn(30)))
+			}
+		}
 		for i := 0; i < 5; i++ {
 			target := rand.Intn(100)
 			rs, _ := db.findRoutes(db.users[i], target, time.Hour*10)

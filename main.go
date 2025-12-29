@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
 	"slices"
 	"time"
 
@@ -15,8 +14,9 @@ type user struct {
 	friends []int
 }
 type schedule struct {
-	st  time.Time
-	dur time.Duration
+	st    time.Time
+	end   time.Time
+	inter time.Duration
 }
 type meeting struct {
 	u1, u2 int //more users per meeting - maybe cancel cross communication
@@ -43,29 +43,38 @@ func NewDB() *database {
 func main() {
 
 	db := NewDB()
+	names := map[string]int{
+		"bennus":   0,
+		"herrmann": 1,
+		"fga":      2,
+		"stefan":   3,
+		"luke":     4,
+	}
 
-	us := make([]*user, 0)
-	for i := 0; i < 10; i++ {
-		u, _ := db.addUser(i)
-		us = append(us, u)
-		for uid2 := range db.users {
-			if rand.Intn(1) == 0 {
-				db.addFriend(u, uid2)
-			}
+	for _, uid := range names {
+		db.addUser(uid)
+	}
+
+	for _, uid := range names {
+		for _, uid2 := range names {
+			db.addFriend(db.users[uid], uid2)
 		}
 	}
 
-	db.addSchedule(us[0], us[1].id, time.Now().AddDate(0, 0, 1), time.Hour*24*7)
-	db.addSchedule(us[1], us[2].id, time.Now().AddDate(0, 0, 2), time.Hour*24*7)
-	db.addSchedule(us[2], us[3].id, time.Now().AddDate(0, 0, 3), 0)
+	monday := time.Date(2025, 12, 29, 21, 0, 0, 0, time.Local)
+	db.addSchedule(db.users[names["bennus"]], names["fga"], monday, time.Hour*2, time.Hour*24*7)
+	db.addSchedule(db.users[names["stefan"]], names["fga"], monday, time.Hour*2, time.Hour*24*7)
+	db.addSchedule(db.users[names["luke"]], names["fga"], monday, time.Hour*2, time.Hour*24*7)
+	db.addSchedule(db.users[names["herrmann"]], names["bennus"], time.Date(2025, 12, 28, 21, 0, 0, 0, time.Local), time.Hour*1, time.Hour*24*7)
+	db.addSchedule(db.users[names["herrmann"]], names["luke"], time.Date(2025, 12, 28, 18, 0, 0, 0, time.Local), time.Hour*1, time.Hour*24*7)
 
-	routes, _ := db.findRoutes(us[0], 3, time.Hour*24*5)
+	routes, _ := db.findRoutes(db.users[names["herrmann"]], names["stefan"], time.Hour*24*15)
 	spew.Dump(routes)
 }
 
 func (db *database) findRoutes(startU *user, goalId int, timeout time.Duration) ([]route, error) {
 	routes := make([]route, 0)
-	toVisit := []route{route{currentlyVisiting: startU.id, nodes: []int{startU.id}, earliestTime: time.Now()}}
+	toVisit := []route{{currentlyVisiting: startU.id, nodes: []int{startU.id}, earliestTime: time.Now()}}
 
 	for len(toVisit) > 0 {
 		r := toVisit[0]
@@ -97,32 +106,49 @@ func (db *database) findRoutes(startU *user, goalId int, timeout time.Duration) 
 			earliest := time.Now().Add(timeout).Add(time.Hour)
 			earliestDup := earliest
 			for _, sched := range scheds {
-				if sched.dur == 0 {
-					if sched.st.After(r.earliestTime) && sched.st.Before(earliest) {
-						earliest = sched.st
+				if sched.inter == 0 {
+					if sched.end.After(r.earliestTime) {
+						earliestMeet := sched.st
+						if sched.st.Before(r.earliestTime) {
+							earliestMeet = r.earliestTime
+						}
+						if earliestMeet.Before(earliest) {
+							earliest = earliestMeet
+						}
 					}
 					continue
 				}
 
-				if sched.st.After(r.earliestTime) || r.earliestTime.Equal(sched.st) {
-					if sched.st.Before(earliest) {
-						earliest = sched.st
+				if sched.end.After(r.earliestTime) || r.earliestTime.Equal(sched.end) {
+					earliestMeet := sched.st
+					if sched.st.Before(r.earliestTime) {
+						earliestMeet = r.earliestTime
+					}
+					if earliestMeet.Before(earliest) {
+						earliest = earliestMeet
 					}
 					continue
 				}
 
 				diffT := r.earliestTime.Sub(sched.st)
-				cnts := diffT / sched.dur
+				cnts := diffT / sched.inter
 
-				t1 := sched.st.Add(sched.dur * cnts)
-				if t1.Equal(r.earliestTime) {
-					if t1.Before(earliest) {
-						earliest = t1
+				t1st := sched.end.Add(sched.inter * cnts)
+				t1end := sched.end.Add(sched.inter * cnts)
+
+				if t1end.Before(r.earliestTime) {
+					t1st = t1st.Add(sched.inter)
+					t1end = t1end.Add(sched.inter)
+				}
+
+				if (t1st.Before(r.earliestTime) || t1st.Equal(r.earliestTime)) &&
+					(t1end.After(r.earliestTime) || t1end.Equal(r.earliestTime)) {
+					earliestMeet := t1st
+					if t1st.Before(r.earliestTime) {
+						earliestMeet = r.earliestTime
 					}
-				} else {
-					t1 = t1.Add(sched.dur)
-					if t1.Before(earliest) {
-						earliest = t1
+					if earliestMeet.Before(earliest) {
+						earliest = earliestMeet
 					}
 				}
 			}
@@ -131,7 +157,7 @@ func (db *database) findRoutes(startU *user, goalId int, timeout time.Duration) 
 				continue
 			}
 
-			if earliest.Sub(time.Now()) > timeout {
+			if time.Until(earliest) > timeout {
 				continue
 			}
 
@@ -154,7 +180,7 @@ func (db *database) findRoutes(startU *user, goalId int, timeout time.Duration) 
 	return routes, nil
 }
 
-func (db *database) addSchedule(u1 *user, u2Id int, date time.Time, interval time.Duration) error {
+func (db *database) addSchedule(u1 *user, u2Id int, date time.Time, dur time.Duration, interval time.Duration) error {
 
 	if !slices.Contains(u1.friends, u2Id) {
 		return fmt.Errorf("You can only add friends, %v is not in your friendlist yet", u2Id)
@@ -177,8 +203,9 @@ func (db *database) addSchedule(u1 *user, u2Id int, date time.Time, interval tim
 	}
 
 	// search if schedule already exists - else add it
+	// todo: merge with existing schedules
 	for _, sc := range scheds {
-		if sc.st == date && sc.dur == interval {
+		if sc.st == date && sc.inter == interval {
 			return fmt.Errorf("schedule already exists")
 		}
 	}
@@ -191,7 +218,7 @@ func (db *database) addSchedule(u1 *user, u2Id int, date time.Time, interval tim
 		db.meetings[ua][ub] = make([]schedule, 0)
 	}
 
-	scheds = append(scheds, schedule{st: date, dur: interval})
+	scheds = append(scheds, schedule{st: date, inter: interval, end: date.Add(dur)})
 	db.meetings[ua][ub] = scheds
 
 	return nil
