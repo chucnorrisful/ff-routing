@@ -45,10 +45,54 @@ func TestFriends(t *testing.T) {
 	}
 }
 
-func BenchmarkRouting(b *testing.B) {
+func TestSimpleRouting(t *testing.T) {
+	db := NewDB()
+	names := map[string]int{
+		"bennus":   0,
+		"herrmann": 1,
+		"fga":      2,
+		"stefan":   3,
+		"luke":     4,
+	}
 
-	k := 1000
-	conn := 18
+	for _, uid := range names {
+		db.addUser(uid)
+	}
+
+	for _, uid := range names {
+		for _, uid2 := range names {
+			db.addFriend(db.users[uid], uid2)
+		}
+	}
+
+	monday := time.Date(2025, 12, 30, 21, 0, 0, 0, time.Local)
+	db.addSchedule(db.users[names["bennus"]], names["fga"], monday, time.Hour*2, time.Hour*24*7)
+	db.addSchedule(db.users[names["stefan"]], names["fga"], monday, time.Hour*2, time.Hour*24*7)
+	db.addSchedule(db.users[names["luke"]], names["fga"], monday, time.Hour*2, time.Hour*24*7)
+	db.addSchedule(db.users[names["herrmann"]], names["bennus"], time.Date(2025, 12, 29, 21, 0, 0, 0, time.Local), time.Hour, time.Hour*24*7)
+	db.addSchedule(db.users[names["herrmann"]], names["luke"], time.Date(2025, 12, 29, 18, 0, 0, 0, time.Local), time.Hour, time.Hour*24*7)
+
+	routes, _ := db.findRoutes(db.users[names["herrmann"]], names["stefan"], time.Hour*24*15, 5)
+
+	if len(routes) != 2 {
+		t.Errorf("should be 2 routes, found %v", len(routes))
+	}
+
+	for _, r := range routes {
+		if len(r.meetings) != 3 {
+			t.Errorf("routes should be length 3, found %v", len(r.meetings))
+		}
+	}
+
+}
+
+func BenchmarkRouting(b *testing.B) {
+	rng := rand.New(rand.NewSource(404))
+	k := 10000
+	conn := 10
+	searchRoutes := 100
+	maxHops := 5
+	timeout := time.Hour * 5
 
 	agg := 0
 	for n := 0; n < b.N; n++ {
@@ -58,17 +102,19 @@ func BenchmarkRouting(b *testing.B) {
 			db.addUser(i)
 		}
 
-		for _, u := range db.users {
+		for j := 0; j < k; j++ {
+			u := db.users[j]
 			for i := 0; i < conn; i++ {
-				db.addFriend(u, rand.Intn(k))
-				db.addSchedule(u, i, time.Now().Add(time.Duration(rand.Intn(10))*time.Hour), time.Hour, time.Hour*time.Duration(rand.Intn(30)))
+				fr := rng.Intn(k)
+				db.addFriend(u, fr)
+				db.addSchedule(u, fr, time.Now().Add(time.Duration(rng.Intn(10))*time.Hour), time.Hour, time.Hour*time.Duration(rng.Intn(30)))
 			}
 		}
-		for i := 0; i < 5; i++ {
-			target := rand.Intn(100)
-			rs, _ := db.findRoutes(db.users[i], target, time.Hour*10)
+		for i := 0; i < searchRoutes; i++ {
+			target := rng.Intn(k)
+			rs, _ := db.findRoutes(db.users[i], target, timeout, maxHops)
 			agg += len(rs)
 		}
 	}
-	fmt.Println(float64(agg) / float64(b.N))
+	fmt.Println(float64(agg) / float64(b.N) / float64(searchRoutes))
 }

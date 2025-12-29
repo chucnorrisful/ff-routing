@@ -2,10 +2,9 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"slices"
 	"time"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 // type repeating date
@@ -41,42 +40,46 @@ func NewDB() *database {
 }
 
 func main() {
+	k := 1000
+	conn := 10
+	searchRoutes := 10
+	maxHops := 5
+	timeout := time.Hour * 5
 
+	agg := 0
 	db := NewDB()
-	names := map[string]int{
-		"bennus":   0,
-		"herrmann": 1,
-		"fga":      2,
-		"stefan":   3,
-		"luke":     4,
+
+	for i := 0; i < k; i++ {
+		db.addUser(i)
 	}
 
-	for _, uid := range names {
-		db.addUser(uid)
-	}
-
-	for _, uid := range names {
-		for _, uid2 := range names {
-			db.addFriend(db.users[uid], uid2)
+	for _, u := range db.users {
+		for i := 0; i < conn; i++ {
+			fr := rand.Intn(k)
+			db.addFriend(u, fr)
+			db.addSchedule(u, fr, time.Now().Add(time.Duration(rand.Intn(10))*time.Hour), time.Hour, time.Hour*time.Duration(rand.Intn(30)))
 		}
 	}
+	for i := 0; i < searchRoutes; i++ {
+		target := rand.Intn(k)
+		rs, _ := db.findRoutes(db.users[i], target, timeout, maxHops)
+		agg += len(rs)
+	}
 
-	monday := time.Date(2025, 12, 29, 21, 0, 0, 0, time.Local)
-	db.addSchedule(db.users[names["bennus"]], names["fga"], monday, time.Hour*2, time.Hour*24*7)
-	db.addSchedule(db.users[names["stefan"]], names["fga"], monday, time.Hour*2, time.Hour*24*7)
-	db.addSchedule(db.users[names["luke"]], names["fga"], monday, time.Hour*2, time.Hour*24*7)
-	db.addSchedule(db.users[names["herrmann"]], names["bennus"], time.Date(2025, 12, 28, 21, 0, 0, 0, time.Local), time.Hour*1, time.Hour*24*7)
-	db.addSchedule(db.users[names["herrmann"]], names["luke"], time.Date(2025, 12, 28, 18, 0, 0, 0, time.Local), time.Hour*1, time.Hour*24*7)
-
-	routes, _ := db.findRoutes(db.users[names["herrmann"]], names["stefan"], time.Hour*24*15)
-	spew.Dump(routes)
+	fmt.Println("%routes found", float64(agg)/float64(searchRoutes))
 }
 
-func (db *database) findRoutes(startU *user, goalId int, timeout time.Duration) ([]route, error) {
+func (db *database) findRoutes(startU *user, goalId int, timeout time.Duration, maxMeetings int) ([]route, error) {
 	routes := make([]route, 0)
 	toVisit := []route{{currentlyVisiting: startU.id, nodes: []int{startU.id}, earliestTime: time.Now()}}
 
+	hops := 0
 	for len(toVisit) > 0 {
+		hops++
+		if hops%10000 == 0 {
+			fmt.Printf("hop %v | currently in queue: %v\n", hops, len(toVisit))
+		}
+
 		r := toVisit[0]
 		toVisit = toVisit[1:]
 
@@ -170,7 +173,7 @@ func (db *database) findRoutes(startU *user, goalId int, timeout time.Duration) 
 
 			if fr == goalId {
 				routes = append(routes, rNew)
-			} else {
+			} else if len(rNew.meetings) <= maxMeetings {
 				toVisit = append(toVisit, rNew)
 			}
 		}
@@ -205,7 +208,7 @@ func (db *database) addSchedule(u1 *user, u2Id int, date time.Time, dur time.Dur
 	// search if schedule already exists - else add it
 	// todo: merge with existing schedules
 	for _, sc := range scheds {
-		if sc.st == date && sc.inter == interval {
+		if sc.st.Equal(date) && sc.inter == interval {
 			return fmt.Errorf("schedule already exists")
 		}
 	}
