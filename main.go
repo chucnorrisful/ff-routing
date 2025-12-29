@@ -54,9 +54,10 @@ func main() {
 }
 
 func launchServer(db *database) {
-	http.HandleFunc("/login", db.authHandler)
-	http.HandleFunc("/register", db.registerHandler)
-	http.HandleFunc("/addFriend", db.addFriendHandler)
+
+	http.HandleFunc("/b/login", db.authHandler)
+	http.HandleFunc("/b/register", db.registerHandler)
+	http.HandleFunc("/b/addFriend", db.addFriendHandler)
 
 	http.ListenAndServe("localhost:8080", http.DefaultServeMux)
 }
