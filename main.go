@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
 	"slices"
 	"time"
 )
@@ -40,44 +39,27 @@ func NewDB() *database {
 }
 
 func main() {
-	k := 1000
-	conn := 10
-	searchRoutes := 10
-	maxHops := 5
-	timeout := time.Hour * 5
 
-	agg := 0
-	db := NewDB()
-
-	for i := 0; i < k; i++ {
-		db.addUser(i)
-	}
-
-	for _, u := range db.users {
-		for i := 0; i < conn; i++ {
-			fr := rand.Intn(k)
-			db.addFriend(u, fr)
-			db.addSchedule(u, fr, time.Now().Add(time.Duration(rand.Intn(10))*time.Hour), time.Hour, time.Hour*time.Duration(rand.Intn(30)))
-		}
-	}
-	for i := 0; i < searchRoutes; i++ {
-		target := rand.Intn(k)
-		rs, _ := db.findRoutes(db.users[i], target, timeout, maxHops)
-		agg += len(rs)
-	}
-
-	fmt.Println("%routes found", float64(agg)/float64(searchRoutes))
 }
 
-func (db *database) findRoutes(startU *user, goalId int, timeout time.Duration, maxMeetings int) ([]route, error) {
+func (db *database) findRoutes(startTime time.Time, startU *user, goalId int, timeout time.Duration, maxMeetings int) ([]route, error) {
 	routes := make([]route, 0)
-	toVisit := []route{{currentlyVisiting: startU.id, nodes: []int{startU.id}, earliestTime: time.Now()}}
+	toVisit := []route{{currentlyVisiting: startU.id, nodes: []int{startU.id}, earliestTime: startTime}}
+	toVisitNext := []route{}
 
 	hops := 0
-	for len(toVisit) > 0 {
+	depth := 0
+	for len(toVisit) > 0 || (len(toVisitNext) > 0 && depth < maxMeetings+1) {
 		hops++
 		if hops%10000 == 0 {
 			fmt.Printf("hop %v | currently in queue: %v\n", hops, len(toVisit))
+		}
+
+		if len(toVisit) == 0 {
+			depth++
+			fmt.Printf("Reached depth %v\n", depth)
+			toVisit = toVisitNext
+			toVisitNext = []route{}
 		}
 
 		r := toVisit[0]
@@ -106,7 +88,7 @@ func (db *database) findRoutes(startU *user, goalId int, timeout time.Duration, 
 				continue
 			}
 
-			earliest := time.Now().Add(timeout).Add(time.Hour)
+			earliest := startTime.Add(timeout).Add(time.Hour)
 			earliestDup := earliest
 			for _, sched := range scheds {
 				if sched.inter == 0 {
@@ -160,7 +142,7 @@ func (db *database) findRoutes(startU *user, goalId int, timeout time.Duration, 
 				continue
 			}
 
-			if time.Until(earliest) > timeout {
+			if earliest.Sub(startTime) > timeout {
 				continue
 			}
 
@@ -174,7 +156,7 @@ func (db *database) findRoutes(startU *user, goalId int, timeout time.Duration, 
 			if fr == goalId {
 				routes = append(routes, rNew)
 			} else if len(rNew.meetings) <= maxMeetings {
-				toVisit = append(toVisit, rNew)
+				toVisitNext = append(toVisitNext, rNew)
 			}
 		}
 
