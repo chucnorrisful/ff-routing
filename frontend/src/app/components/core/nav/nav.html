@@ -1,0 +1,26 @@
+<nav class="navbar">
+  <!-- Left side: title -->
+  <div class="brand">{{ title }}</div>
+
+  <!-- Right side: navigation links / buttons -->
+  <ul class="nav-links">
+    <!-- Loop over the appropriate items -->
+    @for (item of items; track item.label) {
+      <li>
+        @if (item.route) {
+          <!-- Normal router link -->
+          <a
+            [routerLink]="item.route"
+            routerLinkActive="active"
+            class="nav-link"
+          >{{ item.label }}</a>
+        } @else if (item.action) {
+          <!-- Action button (e.g., logout) -->
+          <button type="button" class="nav-button" (click)="item.action()">
+            {{ item.label }}
+          </button>
+        }
+      </li>
+    }
+  </ul>
+</nav>

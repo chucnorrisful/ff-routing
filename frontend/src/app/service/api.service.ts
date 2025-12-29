@@ -1,0 +1,23 @@
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+
+@Injectable({ providedIn: 'root' })
+export class ApiService {
+  private readonly baseUrl = 'https://100.123.46.27';
+
+  constructor(private http: HttpClient) {}
+
+  private url(path: string): string {
+    return `${this.baseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
+  }
+
+  login(username: string, password: string) {
+    const body = { username, password };
+    return this.http.post(this.url('/login'), body);
+  }
+
+  register(password: string) {
+    const body = { pw: password };
+    return this.http.post(this.url('/register'), body);
+  }
+}

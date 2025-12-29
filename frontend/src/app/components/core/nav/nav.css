@@ -1,0 +1,56 @@
+/* -------------------------------------------------
+   Nav component styling – title left, links right
+   ------------------------------------------------- */
+
+.navbar {
+  display: flex;
+  align-items: center;           /* vertical centering */
+  justify-content: space-between;/* title ↔ links */
+  padding: 0.5rem 1.5rem;
+}
+
+/* Brand / title on the left */
+.brand {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+/* Container for the navigation items */
+.nav-links {
+  display: flex;
+  gap: 1rem;                     /* space between items */
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Router links – look like classic nav items */
+.nav-link {
+  color: #fff;
+  text-decoration: none;
+  font-weight: 500;
+  transition: opacity .2s ease-in-out;
+}
+.nav-link:hover,
+.nav-link.active {               /* active class from routerLinkActive */
+  opacity: 0.8;
+}
+
+/* Action button (e.g., Logout) – matches link style */
+.nav-button {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+}
+.nav-button:hover {
+  opacity: 0.8;
+}
+
+/* Optional: make the nav responsive */
+@media (max-width: 640px) {
+  .navbar { flex-direction: column; align-items: stretch; }
+  .nav-links { justify-content: center; margin-top: 0.5rem; }
+}

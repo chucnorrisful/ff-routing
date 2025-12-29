@@ -1,0 +1,42 @@
+/* -------------------------------------------------
+   Dark‑mode page skeleton (no light mode)
+   ------------------------------------------------- */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;               /* full viewport height */
+  font-family: "Inter", sans-serif;
+
+  /* dark background for the whole page */
+  background-color: #121212;
+  color: #e0e0e0;                 /* light‑gray text everywhere */
+}
+
+/* Header / Nav bar – keep your colourful gradient */
+nav {
+  background: var(--red-to-pink-to-purple-vertical-gradient);
+  padding: 0.75rem 1.5rem;
+  color: #fff;                    /* white text on the gradient */
+}
+
+/* Main content area – dark surface with a subtle border */
+main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 2rem;
+
+  background-color: #1e1e1e;      /* slightly lighter than page bg */
+  border-top: 1px solid #333;
+}
+
+/* Footer – dark gray background, light text */
+footer {
+  background: var(--gray-900);    /* keep your existing variable (very dark) */
+  color: #fff;
+  text-align: center;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+}

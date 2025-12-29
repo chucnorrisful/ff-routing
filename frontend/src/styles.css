@@ -1,0 +1,42 @@
+/* You can add global styles to this file, and also import other style files */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;                /* ensure body fills viewport */
+  background-color: #121212;   /* same as our app background */
+  color: #e0e0e0;              /* default text colour for any stray text */
+}
+
+/* Optional – improve font rendering on dark backgrounds */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  max-width: 300px;
+  margin: 2rem auto;
+}
+
+.login-form label {
+  margin-top: 1rem;
+  font-weight: bold;
+}
+
+.login-form input {
+  padding: .5rem;
+  font-size: 1rem;
+}
+
+.login-form button {
+  margin-top: 1.5rem;
+  padding: .6rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
