@@ -72,7 +72,7 @@ func TestSimpleRouting(t *testing.T) {
 	db.addSchedule(db.users[names["herrmann"]], names["bennus"], time.Date(2025, 12, 29, 21, 0, 0, 0, time.Local), time.Hour, time.Hour*24*7)
 	db.addSchedule(db.users[names["herrmann"]], names["luke"], time.Date(2025, 12, 29, 18, 0, 0, 0, time.Local), time.Hour, time.Hour*24*7)
 
-	routes, _ := db.findRoutes(monday.AddDate(0, 0, -2), db.users[names["herrmann"]], names["stefan"], time.Hour*24*15, 5)
+	routes, _ := db.findRoutesMulti(monday.AddDate(0, 0, -2), db.users[names["herrmann"]], names["stefan"], time.Hour*24*15, 5)
 
 	if len(routes) != 2 {
 		t.Errorf("should be 2 routes, found %v", len(routes))
@@ -86,13 +86,22 @@ func TestSimpleRouting(t *testing.T) {
 
 }
 
-// 644554928ns 6 hops 1 route
+// 8h c12 10k 0w 34158061606
+// 8h c12 10k 1w 36240140315
+// 8h c12 10k 2w 20470354741
+// 8h c12 10k 4w 17053845166
+// 8h c12 10k 8w 14688305376
+// 8h c12 10k16w 10672322284
+// 8h c12 10k32w 10120218130
+// 8h c12 10k64w  9008039405
+// 8h c1210k128w  8664273811
+// 8h c1210k1024w 8845683104
 func BenchmarkRouting(b *testing.B) {
 	rng := rand.New(rand.NewSource(404))
 	k := 10000
-	conn := 10
+	conn := 12
 	searchRoutes := 1
-	maxHops := 6
+	maxHops := 8
 	timeout := time.Hour * 5
 
 	agg := 0
@@ -113,7 +122,7 @@ func BenchmarkRouting(b *testing.B) {
 		}
 		for i := 0; i < searchRoutes; i++ {
 			target := rng.Intn(k)
-			rs, _ := db.findRoutes(time.Now(), db.users[i], target, timeout, maxHops)
+			rs, _ := db.findRoutesMulti(time.Now(), db.users[i], target, timeout, maxHops)
 			agg += len(rs)
 		}
 	}

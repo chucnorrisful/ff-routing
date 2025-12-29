@@ -29,6 +29,7 @@ type route struct {
 	meetings          []meeting
 	nodes             []int
 	earliestTime      time.Time
+	bad               bool
 }
 
 func NewDB() *database {
@@ -160,6 +161,158 @@ func (db *database) findRoutes(startTime time.Time, startU *user, goalId int, ti
 			}
 		}
 
+	}
+
+	return routes, nil
+}
+
+func (db *database) findRoutesMulti(startTime time.Time, startU *user, goalId int, timeout time.Duration, maxMeetings int) ([]route, error) {
+	workerCount := 64
+	routes := make([]route, 0)
+	toVisit := []route{{currentlyVisiting: startU.id, nodes: []int{startU.id}, earliestTime: startTime}}
+	toVisitNext := []route{}
+
+	depth := 0
+	for depth < maxMeetings+1 {
+		work := make(chan route, 1)
+		go func() {
+			for _, r := range toVisit {
+				work <- r
+			}
+		}()
+
+		type result struct {
+			toV  []route
+			goal []route
+		}
+		results := make(chan result, 1)
+
+		worker := func() {
+			for {
+				r2, more := <-work
+				if !more {
+					return
+				}
+				res := result{}
+				u, ok := db.users[r2.currentlyVisiting]
+				if !ok {
+					results <- res
+					return
+				}
+
+				for _, fr := range u.friends {
+					if slices.Contains(r2.nodes, fr) {
+						continue
+					}
+
+					a, b := u.id, fr
+					if a > b {
+						a, b = b, a
+					}
+					schedsA, exA := db.meetings[a]
+					if !exA {
+						continue
+					}
+					scheds, exB := schedsA[b]
+					if !exB {
+						continue
+					}
+
+					earliest := startTime.Add(timeout).Add(time.Hour)
+					earliestDup := earliest
+					for _, sched := range scheds {
+						if sched.inter == 0 {
+							if sched.end.After(r2.earliestTime) {
+								earliestMeet := sched.st
+								if sched.st.Before(r2.earliestTime) {
+									earliestMeet = r2.earliestTime
+								}
+								if earliestMeet.Before(earliest) {
+									earliest = earliestMeet
+								}
+							}
+							continue
+						}
+
+						if sched.end.After(r2.earliestTime) || r2.earliestTime.Equal(sched.end) {
+							earliestMeet := sched.st
+							if sched.st.Before(r2.earliestTime) {
+								earliestMeet = r2.earliestTime
+							}
+							if earliestMeet.Before(earliest) {
+								earliest = earliestMeet
+							}
+							continue
+						}
+
+						diffT := r2.earliestTime.Sub(sched.st)
+						cnts := diffT / sched.inter
+
+						t1st := sched.end.Add(sched.inter * cnts)
+						t1end := sched.end.Add(sched.inter * cnts)
+
+						if t1end.Before(r2.earliestTime) {
+							t1st = t1st.Add(sched.inter)
+							t1end = t1end.Add(sched.inter)
+						}
+
+						if (t1st.Before(r2.earliestTime) || t1st.Equal(r2.earliestTime)) &&
+							(t1end.After(r2.earliestTime) || t1end.Equal(r2.earliestTime)) {
+							earliestMeet := t1st
+							if t1st.Before(r2.earliestTime) {
+								earliestMeet = r2.earliestTime
+							}
+							if earliestMeet.Before(earliest) {
+								earliest = earliestMeet
+							}
+						}
+					}
+
+					if earliest.Equal(earliestDup) {
+						continue
+					}
+
+					if earliest.Sub(startTime) > timeout {
+						continue
+					}
+
+					rNew := route{
+						currentlyVisiting: fr,
+						nodes:             append(r2.nodes, fr),
+						meetings:          append(r2.meetings, meeting{u1: a, u2: b, s: earliest}),
+						earliestTime:      earliest,
+					}
+
+					if fr == goalId {
+						res.goal = append(res.goal, rNew)
+					} else if len(rNew.meetings) <= maxMeetings {
+						res.toV = append(res.toV, rNew)
+					}
+				}
+				results <- res
+			}
+		}
+
+		for i := 0; i < workerCount; i++ {
+			go worker()
+		}
+
+		for i := 0; i < len(toVisit); i++ {
+			res := <-results
+			if len(res.toV) > 0 {
+				toVisitNext = append(toVisitNext, res.toV...)
+			}
+			if len(res.goal) > 0 {
+				routes = append(routes, res.toV...)
+			}
+		}
+
+		depth++
+		fmt.Printf("Reached depth %v\n", depth)
+		toVisit = toVisitNext
+		toVisitNext = []route{}
+
+		close(work)
 	}
 
 	return routes, nil
