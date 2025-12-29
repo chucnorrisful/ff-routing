@@ -13,11 +13,11 @@ export class ApiService {
 
   login(username: string, password: string) {
     const body = { username, password };
-    return this.http.post(this.url('/login'), body);
+    return this.http.post(this.url('/b/login'), body);
   }
 
   register(password: string) {
-    const body = { pw: password };
-    return this.http.post(this.url('/register'), body);
+    const body = { "pw": password };
+    return this.http.post(this.url('/b/register'), body);
   }
 }

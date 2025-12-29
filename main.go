@@ -54,7 +54,9 @@ func main() {
 }
 
 func launchServer(db *database) {
-
+	fs := http.FileServer(http.Dir("./frontend/dist/ff-frontend/browser"))
+    
+	http.Handle("/", fs)
 	http.HandleFunc("/b/login", db.authHandler)
 	http.HandleFunc("/b/register", db.registerHandler)
 	http.HandleFunc("/b/addFriend", db.addFriendHandler)
