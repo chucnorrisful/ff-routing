@@ -1,0 +1,9 @@
+# ToDo: setup with shared dist volume, listening node server refreshing frontend asset 
+services:
+  app:
+    go:
+      context: ../
+      dockerfile: build/Dockerfile
+    ports:
+      - 8080:8080
+    
